@@ -10,6 +10,7 @@ class TextSearch:
         self.snippet_index:int = 0
         self.file:str = file
         self.snippets:List[str] = self.get_snippet_list()
+        self.search_mode = 0
 
     # ----------------------------------------------------------
     """ split file by separators containing dashes """
@@ -26,58 +27,100 @@ class TextSearch:
                 snip_lines = ""
         return snippets
     # ----------------------------------------------------------
+    def fzf(self,search,string):
+        s = search
+        l = string
+        li = 0
+        si = 0
+
+        matches = 0
+
+        while li<len(l) and si<len(s):
+            s_ = s[si]
+            l_ = l[li]
+
+            if s_==l_:
+                # print("match ",s_ , si, li)
+                matches += 1
+                si += 1
+                li+=1
+            else:
+                li+=1
+
+        if(matches<len(s)):
+            return 0
+        else:
+            return(matches)
+
     """ fuzzy search in snippet lines, return list of snippets """
     def search(self,search_string) -> List[Tuple[float,str]]:
         search_results = []
         for snippet in self.snippets:
-            alpha = re.sub('[^a-za-z]+', ' ', snippet) # alpha only
-            words_ = alpha.split(' ')
-            words_ = [x for x in words_ if x != ''] # remove empty elements
-            words = list(set(words_)) # remove duplicates
 
-            for word in words:
-                ratio:float = difflib.SequenceMatcher(None,search_string,word).ratio()
-                if ratio>0.5:
-                    result:Tuple[float,str] = (ratio,snippet)
-                    search_results.append(result)
-                    break
+            score_sum = 0
+            for line in snippet.split("\n"):
+                score = self.fzf(search_string,line)
+                # if score>0:
+                    # print(line,score)
+                score_sum += score
+
+            if score_sum>0:
+                result:Tuple[float,str] = (float(score_sum),snippet)
+                search_results.append(result)
         #
         search_results.sort(reverse=True)
         return search_results
     # ----------------------------------------------------------
-    def display_snippet(self,snippet) -> None:
+    def display_snippet(self,snippet) -> str:
+        t = ""
         lines = snippet[1].split("\n")
         for line in lines:
-            print(line)
+            # print(line)
+            t += "\n"+line
+        return t
     # ----------------------------------------------------------
     def on_press(self,key) -> None:
         # convert keycode to string
         keystr ="{0}".format(key)[1:-1]
 
-        if keystr in string.ascii_letters:
-            self.input_char_list.append(keystr)
-        elif key == Key.backspace:
-            if len(self.input_char_list)>0:
+        if str(key).startswith("Key"):
+            if key == Key.backspace:
                 if len(self.input_char_list)>0:
-                    self.input_char_list.pop()
-        elif key == Key.up:
-            self.snippet_index-=1
-        elif key == Key.down:
-            self.snippet_index+=1
+                    if len(self.input_char_list)>0:
+                        self.input_char_list.pop()
+            elif key == Key.up:
+                self.snippet_index-=1
+            elif key == Key.down:
+                self.snippet_index+=1
+            elif key == Key.left:
+                self.search_mode = 0
+            elif key == Key.right:
+                self.search_mode = 1
+            elif key == Key.space:
+                self.input_char_list.append(" ")
+            else:
+                pass
         else:
-            pass
+            self.input_char_list.append(keystr)
 
         # clear terminal
-        print(chr(27) + "[2J")
+        std_out = ""
+        std_out+=chr(27) + "[2J\n"
         search_string = "".join(self.input_char_list)
         results:List[Tuple[float,str]] = self.search(search_string)
+        std_out+=".............................."
 
         if len(results)>0:
             self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
-            self.display_snippet(results[self.snippet_index])
+            tt =self.display_snippet(results[self.snippet_index])
+            std_out += tt
             ratio:float = int(float(results[self.snippet_index][0])*100)/100
-            print(f"{self.snippet_index} of {len(results)-1} : match_ratio: {ratio}")
-        print(search_string)
+
+            std_out+="..............................\n"
+            std_out+=f"{self.snippet_index+1} of {len(results)} : match_ratio: {ratio}"
+
+        std_out+="\n"+search_string
+        print(std_out)
 
 # ----------------------------------------------------------
 
