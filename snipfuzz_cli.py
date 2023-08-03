@@ -1,7 +1,4 @@
 from pynput.keyboard import Key, Listener
-import string 
-import re
-import difflib
 from typing import List,Tuple
 
 class TextSearch:
@@ -40,7 +37,6 @@ class TextSearch:
             l_ = l[li]
 
             if s_==l_:
-                # print("match ",s_ , si, li)
                 matches += 1
                 si += 1
                 li+=1
@@ -53,15 +49,21 @@ class TextSearch:
             return(matches)
 
     """ fuzzy search in snippet lines, return list of snippets """
-    def search(self,search_string) -> List[Tuple[float,str]]:
+    def search(self,search_string,search_mode) -> List[Tuple[float,str]]:
         search_results = []
         for snippet in self.snippets:
 
             score_sum = 0
+            score = 0
             for line in snippet.split("\n"):
-                score = self.fzf(search_string,line)
-                # if score>0:
-                    # print(line,score)
+                if search_mode == 1:
+                    if "#" in line:
+                        score = self.fzf(search_string,line)
+                    else:
+                        pass
+                else:
+                    score = self.fzf(search_string,line)
+
                 score_sum += score
 
             if score_sum>0:
@@ -72,12 +74,11 @@ class TextSearch:
         return search_results
     # ----------------------------------------------------------
     def display_snippet(self,snippet) -> str:
-        t = ""
+        std_out = ""
         lines = snippet[1].split("\n")
         for line in lines:
-            # print(line)
-            t += "\n"+line
-        return t
+            std_out += f"\n{line}"
+        return std_out
     # ----------------------------------------------------------
     def on_press(self,key) -> None:
         # convert keycode to string
@@ -98,6 +99,11 @@ class TextSearch:
                 self.search_mode = 1
             elif key == Key.space:
                 self.input_char_list.append(" ")
+            elif key == Key.alt_l:
+                if self.search_mode == 0:
+                    self.search_mode = 1
+                else:
+                    self.search_mode = 0
             else:
                 pass
         else:
@@ -107,7 +113,7 @@ class TextSearch:
         std_out = ""
         std_out+=chr(27) + "[2J\n"
         search_string = "".join(self.input_char_list)
-        results:List[Tuple[float,str]] = self.search(search_string)
+        results:List[Tuple[float,str]] = self.search(search_string,self.search_mode)
         std_out+=".............................."
 
         if len(results)>0:
@@ -117,7 +123,11 @@ class TextSearch:
             ratio:float = int(float(results[self.snippet_index][0])*100)/100
 
             std_out+="..............................\n"
-            std_out+=f"{self.snippet_index+1} of {len(results)} : match_ratio: {ratio}"
+            search_mode_char = "-"
+            if self.search_mode == 1:
+                search_mode_char = "#"
+
+            std_out+=f"{search_mode_char} {self.snippet_index+1} of {len(results)} : match_ratio: {ratio}"
 
         std_out+="\n"+search_string
         print(std_out)
