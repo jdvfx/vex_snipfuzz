@@ -2,6 +2,11 @@ from pynput.keyboard import Key, Listener
 from typing import List,Tuple
 import subprocess
 import os
+from enum import Enum
+
+class SearchMode(Enum):
+    fuzzy = 0
+    hashtag = 1
 
 class TextSearch:
     def __init__(self,file:str) -> None:
@@ -9,7 +14,7 @@ class TextSearch:
         self.snippet_index:int = 0
         self.file:str = file
         self.snippets:List[str] = self.get_snippet_list()
-        self.search_mode = 0
+        self.search_mode = SearchMode.fuzzy
 
     # ----------------------------------------------------------
     """ split file by separators containing dashes """
@@ -62,7 +67,7 @@ class TextSearch:
             score_sum = 0
             score = 0
             for line in snippet.split("\n"):
-                if search_mode == 1:
+                if search_mode is SearchMode.hashtag:
                     if "#" in line:
                         score = self.fzf(search_string,line)
                     else:
@@ -108,10 +113,10 @@ class TextSearch:
             elif key == Key.space:
                 self.input_char_list.append(" ")
             elif key == Key.alt_l:
-                if self.search_mode == 0:
-                    self.search_mode = 1
+                if self.search_mode is SearchMode.fuzzy:
+                    self.search_mode = SearchMode.hashtag
                 else:
-                    self.search_mode = 0
+                    self.search_mode = SearchMode.fuzzy
                 # self.copy_to_clipboard(self.
 
             else:
@@ -130,9 +135,7 @@ class TextSearch:
 
         if len(results)>0:
             self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
-
             self.current_snippet = results[self.snippet_index]
-
 
             tt = self.display_snippet(self.current_snippet)
             std_out += tt
@@ -140,7 +143,7 @@ class TextSearch:
 
             std_out+="..............................\n"
             search_mode_char = "-"
-            if self.search_mode == 1:
+            if self.search_mode is SearchMode.hashtag:
                 search_mode_char = "#"
 
             std_out+=f"{search_mode_char} {self.snippet_index+1} of {len(results)} : match_ratio: {ratio}"
