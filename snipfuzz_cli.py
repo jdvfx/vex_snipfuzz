@@ -1,5 +1,7 @@
 from pynput.keyboard import Key, Listener
 from typing import List,Tuple
+import subprocess
+import os
 
 class TextSearch:
     def __init__(self,file:str) -> None:
@@ -48,6 +50,10 @@ class TextSearch:
         else:
             return(matches)
 
+    def copy_to_clipboard(self, text:str):
+        subprocess.run(['echo', '-n', text], stdout=subprocess.PIPE)
+        subprocess.run(['xclip', '-selection', 'clipboard'], input=text.encode('utf-8'))
+
     """ fuzzy search in snippet lines, return list of snippets """
     def search(self,search_string,search_mode) -> List[Tuple[float,str]]:
         search_results = []
@@ -79,6 +85,8 @@ class TextSearch:
         for line in lines:
             std_out += f"\n{line}"
         return std_out
+
+
     # ----------------------------------------------------------
     def on_press(self,key) -> None:
         # convert keycode to string
@@ -104,6 +112,8 @@ class TextSearch:
                     self.search_mode = 1
                 else:
                     self.search_mode = 0
+                # self.copy_to_clipboard(self.
+
             else:
                 pass
         else:
@@ -112,15 +122,21 @@ class TextSearch:
         # clear terminal
         std_out = ""
         std_out+=chr(27) + "[2J\n"
+        # create the search string text from char array
         search_string = "".join(self.input_char_list)
+
         results:List[Tuple[float,str]] = self.search(search_string,self.search_mode)
         std_out+=".............................."
 
         if len(results)>0:
             self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
-            tt =self.display_snippet(results[self.snippet_index])
+
+            self.current_snippet = results[self.snippet_index]
+
+
+            tt = self.display_snippet(self.current_snippet)
             std_out += tt
-            ratio:float = int(float(results[self.snippet_index][0])*100)/100
+            ratio:str = f"{float(results[self.snippet_index][0]):.2f}"
 
             std_out+="..............................\n"
             search_mode_char = "-"
@@ -132,9 +148,12 @@ class TextSearch:
         std_out+="\n"+search_string
         print(std_out)
 
-# ----------------------------------------------------------
-
-      
+        if key == Key.ctrl:
+            print(chr(27) + "[2J\n")
+            os.system("clear")
+            text = self.current_snippet[1]
+            self.copy_to_clipboard(text)
+            return False  # Stop the listener
 
 
 ts = TextSearch("vex.c")
