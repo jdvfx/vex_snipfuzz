@@ -1,7 +1,6 @@
 from pynput.keyboard import Key, Listener
 from typing import List,Tuple
 import subprocess
-import os
 from enum import Enum
 
 class SearchMode(Enum):
@@ -9,6 +8,7 @@ class SearchMode(Enum):
     hashtag = 1
 
 class TextSearch:
+
     def __init__(self,file:str) -> None:
         self.input_char_list:List[str] = []
         self.snippet_index:int = 0
@@ -72,8 +72,10 @@ class TextSearch:
                         score = self.fzf(search_string,line)
                     else:
                         pass
-                else:
+                elif search_mode is SearchMode.fuzzy:
                     score = self.fzf(search_string,line)
+                else: # would use match/case if Python 3.10
+                    pass
 
                 score_sum += score
 
@@ -91,7 +93,6 @@ class TextSearch:
             std_out += f"\n{line}"
         return std_out
 
-
     # ----------------------------------------------------------
     def on_press(self,key) -> None:
         # convert keycode to string
@@ -106,10 +107,6 @@ class TextSearch:
                 self.snippet_index-=1
             elif key == Key.down:
                 self.snippet_index+=1
-            elif key == Key.left:
-                self.search_mode = 0
-            elif key == Key.right:
-                self.search_mode = 1
             elif key == Key.space:
                 self.input_char_list.append(" ")
             elif key == Key.alt_l:
@@ -117,21 +114,18 @@ class TextSearch:
                     self.search_mode = SearchMode.hashtag
                 else:
                     self.search_mode = SearchMode.fuzzy
-                # self.copy_to_clipboard(self.
-
             else:
                 pass
         else:
             self.input_char_list.append(keystr)
 
         # clear terminal
-        std_out = ""
-        std_out+=chr(27) + "[2J\n"
+        std_out = chr(27) + "[2J\n"
+        std_out += ".............................."
         # create the search string text from char array
         search_string = "".join(self.input_char_list)
 
         results:List[Tuple[float,str]] = self.search(search_string,self.search_mode)
-        std_out+=".............................."
 
         if len(results)>0:
             self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
@@ -141,23 +135,21 @@ class TextSearch:
             std_out += tt
             ratio:str = f"{float(results[self.snippet_index][0]):.2f}"
 
-            std_out+="..............................\n"
+            std_out += "..............................\n"
             search_mode_char = "-"
             if self.search_mode is SearchMode.hashtag:
                 search_mode_char = "#"
 
-            std_out+=f"{search_mode_char} {self.snippet_index+1} of {len(results)} : match_ratio: {ratio}"
+            std_out += f"{search_mode_char} {self.snippet_index+1} of {len(results)} : match_ratio: {ratio}"
 
-        std_out+="\n"+search_string
+        std_out += "\n"+search_string
         print(std_out)
 
+        # copy snippet to clipboard and exit
         if key == Key.ctrl:
-            print(chr(27) + "[2J\n")
-            os.system("clear")
             text = self.current_snippet[1]
             self.copy_to_clipboard(text)
-            return False  # Stop the listener
-
+            return False  # Stop the listener and exit
 
 ts = TextSearch("vex.c")
 with Listener(
