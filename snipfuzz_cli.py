@@ -7,6 +7,10 @@ class SearchMode(Enum):
     fuzzy = 0
     hashtag = 1
 
+class CaseSensive(Enum):
+    upperlower = 0
+    lower = 1
+
 class SnipFuzz:
 
     def __init__(self,file:str) -> None:
@@ -15,6 +19,7 @@ class SnipFuzz:
         self.file:str = file
         self.snippets:List[str] = self.get_snippet_list()
         self.search_mode = SearchMode.fuzzy
+        self.case_sensitive = CaseSensive.upperlower
 
     # ----------------------------------------------------------
     """ split file by separators containing dashes """
@@ -31,7 +36,7 @@ class SnipFuzz:
                 snip_lines = ""
         return snippets
     # ----------------------------------------------------------
-    def fuzzy_search(self,search,string):
+    def fuzzy_search(self,search,string) -> int:
         s = search
         l = string
         li = 0
@@ -55,7 +60,7 @@ class SnipFuzz:
         else:
             return(matches)
 
-    def copy_to_clipboard(self, text:str):
+    def copy_to_clipboard(self, text:str) -> None:
         subprocess.run(['echo', '-n', text], stdout=subprocess.PIPE)
         subprocess.run(['xclip', '-selection', 'clipboard'], input=text.encode('utf-8'))
 
@@ -114,6 +119,11 @@ class SnipFuzz:
                     self.search_mode = SearchMode.hashtag
                 else:
                     self.search_mode = SearchMode.fuzzy
+            elif key == Key.shift:
+                if self.case_sensitive is CaseSensive.upperlower:
+                    self.case_sensitive = CaseSensive.lower
+                else:
+                    self.case_sensitive = CaseSensive.upperlower
             else:
                 pass
         else:
@@ -125,7 +135,13 @@ class SnipFuzz:
         # create the search string text from char array
         search_string = "".join(self.input_char_list)
 
+        
+        if self.case_sensitive is CaseSensive.lower:
+            search_string = search_string.lower()
+
         results:List[Tuple[float,str]] = self.search(search_string,self.search_mode)
+
+        ratio:str = ""
 
         if len(results)>0:
             self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
@@ -135,13 +151,15 @@ class SnipFuzz:
             std_out += tt
             ratio:str = f"{float(results[self.snippet_index][0]):.2f}"
 
-            std_out += "..............................\n"
-            search_mode_char = "-"
-            if self.search_mode is SearchMode.hashtag:
-                search_mode_char = "#"
-
-            std_out += f"{search_mode_char} {self.snippet_index+1} of {len(results)} : match_ratio: {ratio}"
-
+        # build cli output string and print
+        std_out += "..............................\n"
+        search_mode_char = "-"
+        case_sensitive_char = "A"
+        if self.search_mode is SearchMode.hashtag:
+            search_mode_char = "#"
+        if self.case_sensitive is CaseSensive.lower:
+            case_sensitive_char = "a"
+        std_out += f"{case_sensitive_char} {search_mode_char} {self.snippet_index} of {len(results)} : match_ratio: {ratio}"
         std_out += "\n"+search_string
         print(std_out)
 
