@@ -161,7 +161,7 @@ class SnipFuzz:
 
         ratio:str = ""
 
-        self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
+        self.snippet_index:int = min(max(0,self.snippet_index),len(results))
         if len(results)>0:
             self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
             self.current_snippet = results[self.snippet_index]
