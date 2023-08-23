@@ -84,7 +84,8 @@ class SnipFuzz(QtWidgets.QWidget):
                 words_ = alpha.split(' ')
                 words_ = [x for x in words_ if x != ''] # remove empty elements
                 words = list(set(words_)) # remove duplicates
-
+                
+                # basic fuzzy search with difflib
                 for word in words:
                     ratio:float = difflib.SequenceMatcher(None,search_string,word).ratio()
                     if ratio>0.8:

@@ -31,7 +31,7 @@ class SnipFuzz:
                 snip_lines = ""
         return snippets
     # ----------------------------------------------------------
-    def fzf(self,search,string):
+    def fuzzy_search(self,search,string):
         s = search
         l = string
         li = 0
@@ -69,11 +69,11 @@ class SnipFuzz:
             for line in snippet.split("\n"):
                 if search_mode is SearchMode.hashtag:
                     if "#" in line:
-                        score = self.fzf(search_string,line)
+                        score = self.fuzzy_search(search_string,line)
                     else:
                         pass
                 elif search_mode is SearchMode.fuzzy:
-                    score = self.fzf(search_string,line)
+                    score = self.fuzzy_search(search_string,line)
                 else: # would use match/case if Python 3.10
                     pass
 
