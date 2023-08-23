@@ -2,6 +2,7 @@ from pynput.keyboard import Key, Listener
 from typing import List,Tuple
 import subprocess
 from enum import Enum
+from termcolor import colored
 
 class SearchMode(Enum):
     fuzzy = 0
@@ -36,29 +37,34 @@ class SnipFuzz:
                 snip_lines = ""
         return snippets
     # ----------------------------------------------------------
-    def fuzzy_search(self,search,string) -> int:
+    def fuzzy_search(self,search,string) -> Tuple[int,str]:
         s = search
         l = string
         li = 0
         si = 0
 
         matches = 0
+        newstr =""
 
         while li<len(l) and si<len(s):
             s_ = s[si]
             l_ = l[li]
 
             if s_==l_:
+                newstr += colored(l_,"red")
                 matches += 1
                 si += 1
                 li+=1
             else:
+                newstr += colored(l_,"white")
                 li+=1
 
         if(matches<len(s)):
-            return 0
+            return (0, string)
         else:
-            return(matches)
+            l_ = l[li:]
+            newstr += colored(l_,"white")
+            return (matches, newstr)
 
     def copy_to_clipboard(self, text:str) -> None:
         subprocess.run(['echo', '-n', text], stdout=subprocess.PIPE)
@@ -71,21 +77,30 @@ class SnipFuzz:
 
             score_sum = 0
             score = 0
+            result = (0,"")
+            snippet_with_colors = ""
+
             for line in snippet.split("\n"):
                 if search_mode is SearchMode.hashtag:
                     if "#" in line:
-                        score = self.fuzzy_search(search_string,line)
+                        result = self.fuzzy_search(search_string,line)
+                        scolors = result[1]
+                        score = result[0]
+                        snippet_with_colors += scolors + "\n"
                     else:
                         pass
                 elif search_mode is SearchMode.fuzzy:
-                    score = self.fuzzy_search(search_string,line)
+                    result = self.fuzzy_search(search_string,line)
+                    scolors = result[1]
+                    score = result[0]
+                    snippet_with_colors += scolors + "\n"
                 else: # would use match/case if Python 3.10
                     pass
 
                 score_sum += score
 
             if score_sum>0:
-                result:Tuple[float,str] = (float(score_sum),snippet)
+                result:Tuple[float,str] = (float(score_sum),snippet_with_colors)
                 search_results.append(result)
         #
         search_results.sort(reverse=True)
@@ -97,6 +112,8 @@ class SnipFuzz:
         for line in lines:
             std_out += f"\n{line}"
         return std_out
+        # return snippet[1]
+
 
     # ----------------------------------------------------------
     def on_press(self,key) -> None:
@@ -131,6 +148,7 @@ class SnipFuzz:
 
         # clear terminal
         std_out = chr(27) + "[2J\n"
+        # std_out = ""
         std_out += ".............................."
         # create the search string text from char array
         search_string = "".join(self.input_char_list)
@@ -148,6 +166,8 @@ class SnipFuzz:
             self.current_snippet = results[self.snippet_index]
 
             tt = self.display_snippet(self.current_snippet)
+            print(self.current_snippet)
+            # exit()
             std_out += tt
             ratio:str = f"{float(results[self.snippet_index][0]):.2f}"
 
