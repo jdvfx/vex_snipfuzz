@@ -8,3 +8,4 @@ Keys:<br>
 - <code>alt</code> switch to hashtag mode search mode (CLI only)<br>
 
 ![](https://github.com/jdvfx/vex_snipfuzz/blob/main/snipfuzz.gif)
+![](https://github.com/jdvfx/vex_snipfuzz/blob/main/snipfuzz_cli.gif)
