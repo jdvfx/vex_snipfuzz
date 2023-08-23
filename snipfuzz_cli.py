@@ -71,28 +71,28 @@ class SnipFuzz:
         subprocess.run(['xclip', '-selection', 'clipboard'], input=text.encode('utf-8'))
 
     """ fuzzy search in snippet lines, return list of snippets """
-    def search(self,search_string,search_mode) -> List[Tuple[float,str]]:
+    def search(self,search_string,search_mode) -> List[Tuple[float,str,str]]:
         search_results = []
         for snippet in self.snippets:
 
             score_sum = 0
             score = 0
-            result = (0,"")
+            result = (0,"",snippet)
             snippet_with_colors = ""
 
             for line in snippet.split("\n"):
                 if search_mode is SearchMode.hashtag:
                     if "#" in line:
-                        result = self.fuzzy_search(search_string,line)
-                        scolors = result[1]
-                        score = result[0]
+                        searchresult = self.fuzzy_search(search_string,line)
+                        scolors = searchresult[1]
+                        score = searchresult[0]
                         snippet_with_colors += scolors + "\n"
                     else:
                         pass
                 elif search_mode is SearchMode.fuzzy:
-                    result = self.fuzzy_search(search_string,line)
-                    scolors = result[1]
-                    score = result[0]
+                    searchresult = self.fuzzy_search(search_string,line)
+                    scolors = searchresult[1]
+                    score = searchresult[0]
                     snippet_with_colors += scolors + "\n"
                 else: # would use match/case if Python 3.10
                     pass
@@ -100,7 +100,7 @@ class SnipFuzz:
                 score_sum += score
 
             if score_sum>0:
-                result:Tuple[float,str] = (float(score_sum),snippet_with_colors)
+                result:Tuple[float,str,str] = (float(score_sum),snippet_with_colors,snippet)
                 search_results.append(result)
         #
         search_results.sort(reverse=True)
@@ -157,10 +157,11 @@ class SnipFuzz:
         if self.case_sensitive is CaseSensive.lower:
             search_string = search_string.lower()
 
-        results:List[Tuple[float,str]] = self.search(search_string,self.search_mode)
+        results:List[Tuple[float,str,str]] = self.search(search_string,self.search_mode)
 
         ratio:str = ""
 
+        self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
         if len(results)>0:
             self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
             self.current_snippet = results[self.snippet_index]
@@ -185,7 +186,7 @@ class SnipFuzz:
 
         # copy snippet to clipboard and exit
         if key == Key.ctrl:
-            text = self.current_snippet[1]
+            text = self.current_snippet[2]
             self.copy_to_clipboard(text)
             return False  # Stop the listener and exit
 
