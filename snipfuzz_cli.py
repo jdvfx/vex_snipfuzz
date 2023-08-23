@@ -7,7 +7,7 @@ class SearchMode(Enum):
     fuzzy = 0
     hashtag = 1
 
-class TextSearch:
+class SnipFuzz:
 
     def __init__(self,file:str) -> None:
         self.input_char_list:List[str] = []
@@ -151,7 +151,7 @@ class TextSearch:
             self.copy_to_clipboard(text)
             return False  # Stop the listener and exit
 
-ts = TextSearch("vex.c")
+ts = SnipFuzz("vex.c")
 with Listener(
         on_press=ts.on_press,
         ) as listener:
