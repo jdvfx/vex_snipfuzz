@@ -5,7 +5,7 @@ import re
 import difflib
 from typing import List,Tuple
 
-class FontDemo(QtWidgets.QWidget):
+class SnipFuzz(QtWidgets.QWidget):
 
     def __init__(self, wrangle, file:str):
         QtWidgets.QWidget.__init__(self)
@@ -106,6 +106,6 @@ vex_file:str = "/home/bunker/projects/vex_snipfuzz/vex.c"
 
 wrangle = find_wrangle()
 if wrangle is not None:
-    dialog = FontDemo(wrangle,vex_file)
+    dialog = SnipFuzz(wrangle,vex_file)
     dialog.show()
 
