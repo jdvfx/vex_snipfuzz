@@ -40,6 +40,8 @@ class SnipFuzz:
     def fuzzy_search(self,search,string) -> Tuple[int,str]:
         s = search
         l = string
+
+
         li = 0
         si = 0
 
@@ -50,13 +52,19 @@ class SnipFuzz:
             s_ = s[si]
             l_ = l[li]
 
+            # stash original letter before case change
+            l__ = l_
+            if self.case_sensitive == CaseSensive.lower:
+                s_ = s_.lower()
+                l_ = l_.lower()
+
             if s_==l_:
-                newstr += colored(l_,"red")
+                newstr += colored(l__,"red")
                 matches += 1
                 si += 1
                 li+=1
             else:
-                newstr += colored(l_,"white")
+                newstr += colored(l__,"white")
                 li+=1
 
         if(matches<len(s)):
