@@ -41,7 +41,6 @@ class SnipFuzz:
         s = search
         l = string
 
-
         li = 0
         si = 0
 
@@ -120,8 +119,6 @@ class SnipFuzz:
         for line in lines:
             std_out += f"\n{line}"
         return std_out
-        # return snippet[1]
-
 
     # ----------------------------------------------------------
     def on_press(self,key) -> None:
@@ -133,6 +130,10 @@ class SnipFuzz:
                 if len(self.input_char_list)>0:
                     if len(self.input_char_list)>0:
                         self.input_char_list.pop()
+            elif key == Key.left:
+                self.snippet_index=0
+            elif key == Key.right:
+                self.snippet_index=len(self.snippets)-1
             elif key == Key.up:
                 self.snippet_index-=1
             elif key == Key.down:
@@ -160,7 +161,6 @@ class SnipFuzz:
         std_out += ".............................."
         # create the search string text from char array
         search_string = "".join(self.input_char_list)
-
         
         if self.case_sensitive is CaseSensive.lower:
             search_string = search_string.lower()
@@ -188,7 +188,7 @@ class SnipFuzz:
             search_mode_char = "#"
         if self.case_sensitive is CaseSensive.lower:
             case_sensitive_char = "a"
-        std_out += f"{case_sensitive_char} {search_mode_char} {self.snippet_index} of {len(results)} : match_ratio: {ratio}"
+        std_out += f"{case_sensitive_char} {search_mode_char} {self.snippet_index} of {len(results)-1} : match_ratio: {ratio}"
         std_out += "\n"+search_string
         print(std_out)
 
