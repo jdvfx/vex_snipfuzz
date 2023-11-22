@@ -10,5 +10,7 @@ Keys:<br>
 - <code>right</code> jump to last snippet (CLI only)<br>
 - <code>shift</code> switch to case insensitive search (CLI only)<br>
 
+note: CLI versions require X.org, does not work with Wayland!
+
 ![](https://github.com/jdvfx/vex_snipfuzz/blob/main/snipfuzz.gif)
 ![](https://github.com/jdvfx/vex_snipfuzz/blob/main/snipfuzz_cli.gif)
