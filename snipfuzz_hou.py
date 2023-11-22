@@ -81,21 +81,43 @@ class SnipFuzz(QtWidgets.QWidget):
     basic 'FZF like' fuzzy search
     """
             
-    def fuzzy_search(self, search, string):
-        li, si, matches = 0, 0, 0
-        
-        while li < len(string) and si < len(search):
-            if search[si] == string[li]:
-                matches += 1
+    def fuzzy_search(self, search, string) -> float:
+
+        # TO DO:
+        # find the best score possible, instead of searching once only
+
+        s = search
+        l = string
+        li = 0
+        si = 0
+
+        match_score = 0.0
+        last_match_index = 0
+        letters_found = 0
+
+        while li<len(l) and si<len(s):
+            s_ = s[si]
+            l_ = l[li]
+
+            if s_==l_:
+                letters_found += 1
                 si += 1
-            li += 1
-    
-        return 0 if 0 < matches < len(search) else matches 
-        
+                li+=1
+                dist = abs(last_match_index-li)
+                match_score += 1/float(dist)
+                last_match_index = li
+            else:
+                li+=1
+        if letters_found<len(search):
+            return 0.0
+        else:
+            return match_score
+            
+
     # ----------------------------------------------------------
     """ fuzzy search in snippet lines, return list of snippets """
-    def search_snippets(self,search_string) -> List[Tuple[int,int]]:
-    
+    def search_snippets(self,search_string) -> List[Tuple[float,int]]:
+        print("...............")
         search_results = []
         
         if len(search_string)==0:
@@ -106,13 +128,19 @@ class SnipFuzz(QtWidgets.QWidget):
             if self.case_sensitive == CaseSensive.lower:
                 search_string = search_string.lower()
                 
-            matches = self.fuzzy_search(search_string,snippet)
+            match_score = self.fuzzy_search(search_string,snippet)
+            
+            #print("match_score" , smatch_score)
+         
 
-            if matches>0:
-                result:Tuple[int,int] = (matches,idx)
+            if match_score>0:
+                print(idx,match_score)
+                result:Tuple[float,int] = (match_score,idx)
                 search_results.append(result)
 
         search_results.sort(reverse=True)
+
+
         return search_results        
         
 
@@ -142,7 +170,7 @@ class SnipFuzz(QtWidgets.QWidget):
     # ----------------------------------------------------------
     def update_text(self,text):
     
-        results:List[Tuple[int,int]] = self.search_snippets(text)
+        results:List[Tuple[float,int]] = self.search_snippets(text)
 
         case = "a" if self.case_sensitive == CaseSensive.upperlower else "A"
         search_mode = "fuzzy" if self.search_mode == SearchMode.fuzzy else "#"
@@ -152,8 +180,9 @@ class SnipFuzz(QtWidgets.QWidget):
             self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
             current_snippet = self.snippets[results[self.snippet_index][1]]
             self.ui.text.setText(current_snippet)
+            match = results[self.snippet_index][0]
 
-            s = f"{s}  {self.snippet_index+1}/{len(results)}"
+            s = f"{s}  {self.snippet_index+1}/{len(results)}    match:{match:.2f}"
 
         self.ui.status.setText(s)
 
