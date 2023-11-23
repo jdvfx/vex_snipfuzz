@@ -182,7 +182,7 @@ class SnipFuzz(QtWidgets.QWidget):
     
         results:List[Tuple[float,int]] = self.search_snippets(text)
 
-        case = "a" if self.case_sensitive == CaseSensive.upperlower else "A"
+        case = "A" if self.case_sensitive == CaseSensive.upperlower else "a"
         search_mode = "fuzzy" if self.search_mode == SearchMode.fuzzy else "#"
         s = f"{search_mode} {case}"
         
