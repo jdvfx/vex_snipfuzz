@@ -20,6 +20,6 @@ Installation (Houdini)
 
 note: CLI versions require X.org, does not work with Wayland!
 
-![](https://github.com/jdvfx/vex_snipfuzz/blob/main/snipfuzz.gif)
+![](https://github.com/jdvfx/vex_snipfuzz/blob/main/gif/snipfuzz.gif)
 
-![](https://github.com/jdvfx/vex_snipfuzz/blob/main/snipfuzz_cli.gif)
+![](https://github.com/jdvfx/vex_snipfuzz/blob/main/gif/snipfuzz_cli.gif)
