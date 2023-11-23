@@ -4,6 +4,162 @@ int pt_found = pcnumfound(pcopen(1,"P",v@P,chf("radius"),1));
 if(pt_found == chi("reverse_selection")){
         removepoint(0,i@ptnum,1);
 }
+
+/* -------------------------------------------------------------- */
+// #cull points outside/inside #bounds 
+vector r = relbbox(1,v@P);
+if(r.x>1||r.y>1||r.z>1||r.x<0||r.y<0||r.z<0){
+    removepoint(0,i@ptnum);
+}
+
+// -----------------------------------------------------------------
+//convert #prim_group to #prim_attrib
+string groups[] = detailintrinsic(0, "primitivegroups");
+s[]@groups=groups;
+int a=0;
+foreach(string i; groups){   
+    if(inprimgroup(0,i,@primnum) == 1){
+        s@group=i;
+        break;
+    }
+    a++;
+}
+
+/* -------------------------------------------------------------- */
+// #orient to N and up 
+v@up = qrotate(p@orient, {0,1,0});
+v@N = qrotate(p@orient, {0,0,1});
+
+/* -------------------------------------------------------------- */
+// N + up to #orient
+vector Xaxis = normalize(v@N);
+vector Yaxis = normalize(v@up);
+vector Zaxis = cross(Xaxis,Yaxis);
+vector center = v@P;
+matrix myTransform = set(Xaxis,Yaxis,Zaxis,center);
+p@orient = quaternion(matrix3(myTransform));
+
+// #fade #volume edges (bounds)
+vector r = relbbox(0,v@P);
+float o = chf("padding");
+float s = chf("fade_start");
+float d = fit(r.x,s,o,0,1)*fit(r.x,1-s,1-o,0,1)*fit(r.y,s,o,0,1)*fit(r.y,1-s,1-o,0,1)*fit(r.z,s,o,0,1)*fit(r.z,1-s,1-o,0,1);
+f@density *= d;
+
+// -----------------------------------------------------------------
+// #project on #sdf
+vector d = normalize(chv("project_direction"));
+for(int i=0;i<chi("steps");i++){
+    @P += d*chf("step_size");
+    float vs = volumesample(1,0,@P);
+    if(vs<0){
+        break;
+    }
+    if(i==chi("steps")-1){
+        removepoint(0,@ptnum,1);
+    }
+}
+
+/* -------------------------------------------------------------- */
+// #volume #camera #cull
+vector pndc = toNDC(chs("camera_name"), v@P);
+// padding
+float pad = chf("padding");
+if(pndc.x< 0-pad || pndc.x>1+pad || pndc.y< 0-pad || pndc.y>1+pad || pndc.z>=0 ){
+    f@density=0;    
+}
+
+/* -------------------------------------------------------------- */
+// #point #decimate
+int ptvar = i@ptnum;
+if (chi("use_id")) ptvar = i@id;
+if(rand(ptvar+chf("seed"))>chf("threshold"))removepoint(0,i@ptnum);
+
+// -----------------------------------------------------------------
+// #point #density (normalized)
+int pc = pcnumfound(pcopen(0,"P",v@P,chf("radius"),chi("maxpoints")));
+float density = float(pc)/float(chi("maxpoints"));
+v@Cd = density+{0,0,1};
+
+/* -------------------------------------------------------------- */
+// #onoise 3D 
+vector n3 =onoise (v@P*chf("n3_freq")+chv("n3_offset"),chi("n3_turb"),ch("n3_rough"),ch("n3_atten"))*vector(chf("n3_amp"));
+
+/* -------------------------------------------------------------- */
+// #onoise 1D
+float n1 =onoise (v@P*chf("n1_freq")+chv("n1_offset"),chi("n1_turb"),ch("n1_rough"),ch("n1_atten"))*chf("n1_amp");
+
+// -----------------------------------------------------------------
+// #hue #shift
+vector hsv = rgbtohsv(@Cd);
+hsv.x+=chf("hue_shift");
+@Cd= hsvtorgb(hsv);
+
+/* -------------------------------------------------------------- */
+// remove prims with less than 3 points
+int pts[] = primpoints( 0, i@primnum );
+if( len(pts) < 3 ) removeprim( 0, i@primnum, 1 );
+
+/* -------------------------------------------------------------- */
+// #ramp from #distance to #surface 
+int prim;
+vector uv;
+float dmin = chf("dist_min");
+float dmax = chf("dist_max");
+float d = xyzdist(1,v@P,prim,uv,dmax);
+float f = fit(d,dmin,dmax,0,1);
+if(chi("reverse_direction")==1)f=fit01(f,1,0);
+v@Cd = f + {0,0,1};
+
+/* -------------------------------------------------------------- */
+// #delete by #proximity to #surface (run over points)
+int prim;
+vector uv;
+float d = xyzdist(1,v@P,prim,uv,chf("maxdist"));
+if(chi("invert_selection") && prim!=-1)removepoint(0,i@ptnum);
+if(!chi("invert_selection") && prim==-1)removepoint(0,i@ptnum);
+
+// -----------------------------------------------------------------
+// #volume #diffusion
+// can be used with a mask unlike volume blur SOP
+float dsum = 0;
+float mask = 1; // could be from ramp,volume,noise 
+
+for(int i=0;i<chi("steps");i++){
+    vector n = (rand(v@P*2389.42+@Frame+i)*vector(2)-1)*chf("diffusion")*mask;
+    dsum += volumesample(0,0,@P+n);
+
+}
+f@density = dsum / float(chi("steps"));
+/* -------------------------------------------------------------- */
+// #volume #motionblur using vel from second input (not VDB)
+vector v = volumesamplev(1,"vel",@P);
+if(length(v)>0){
+    float dsum=0;
+    for(int i=0;i< chi("steps");i++){
+        float f = float(i)/float(chi("steps")-1);
+        dsum += volumesample(0,0,v@P+v*chf("displacement")*f);
+    }
+    f@density = dsum /float(chi("steps"));
+}
+// -----------------------------------------------------------------
+// #soft #clip (from pyro1 vfl)
+// example usage: @P.y=softclip(@P.y,2,1);
+float softclip (
+      float f; // field value
+      float s; // start val for compression
+      float c; // compression
+   )
+{
+   float out = f;
+   if(f>s && c>0) {
+      float ki = 1.0 / c;
+      float w  = 1.0 / (c*log(10.0));
+      float v  = log10(pow(w,ki));
+      out = log10(pow((f-s)+w,ki)) - v + s;
+   }
+   return out;
+}
 /* -------------------------------------------------------------- */
 // #rotate vel around axis
 float angle = radians(chf("angle_in_degrees"));
@@ -29,10 +185,6 @@ line(p0,p1);
 line(p0,p2);
 line(p0,p3);
 /* -------------------------------------------------------------- */
-// #orient to N and up 
-v@up = qrotate(p@orient, {0,1,0});
-v@N = qrotate(p@orient, {0,0,1});
-/* -------------------------------------------------------------- */
 // rainbow XYZ
 v@Cd = relbbox(0,v@P);
 /* -------------------------------------------------------------- */
@@ -50,24 +202,6 @@ int prim;
 vector uv;
 float f = xyzdist(1,v@P,prim,uv,chf("dist_max"));
 v@Cd = fit(f,chf("dist_min"),chf("dist_max"),1,0)+{0,0,1};
-/* -------------------------------------------------------------- */
-// #cull points outside/inside #bounds 
-vector r = relbbox(1,v@P);
-if(r.x>1||r.y>1||r.z>1||r.x<0||r.y<0||r.z<0){
-    removepoint(0,i@ptnum);
-}
-/* -------------------------------------------------------------- */
-// #fade #volume edges (bounds)
-vector r = relbbox(0,v@P);
-float o = chf("padding");
-float s = chf("fade_start");
-float d = fit(r.x,s,o,0,1)*fit(r.x,1-s,1-o,0,1)*fit(r.y,s,o,0,1)*fit(r.y,1-s,1-o,0,1)*fit(r.z,s,o,0,1)*fit(r.z,1-s,1-o,0,1);
-f@density *= d;
-/* -------------------------------------------------------------- */
-// #point #decimate
-int ptvar = i@ptnum;
-if (chi("use_id")) ptvar = i@id;
-if(rand(ptvar+chf("seed"))>chf("threshold"))removepoint(0,i@ptnum);
 /* -------------------------------------------------------------- */
 // #sigmoid  function
 // x  : input value
@@ -154,20 +288,12 @@ foreach (int pt; n){
 avgN /= len(n)+1;
 v@N = avgN;
 
-/* -------------------------------------------------------------- */
-// #onoise 3D 
-vector n3 =onoise (v@P*chf("n3_freq")+chv("n3_offset"),chi("n3_turb"),ch("n3_rough"),ch("n3_atten"))*vector(chf("n3_amp"));
-
-/* -------------------------------------------------------------- */
-// #onoise 1D
-float n1 =onoise (v@P*chf("n1_freq")+chv("n1_offset"),chi("n1_turb"),ch("n1_rough"),ch("n1_atten"))*chf("n1_amp");
 
 /* -------------------------------------------------------------- */
 // #transform geo with extractTransform as input 2
 vector pivot=point(1,"pivot",0);
 vector p =point(1,"P",0);
 p@orient = point(1,"orient",0);
-
 matrix3 m = qconvert(p@orient);
 
 v@P-=pivot;
@@ -218,19 +344,11 @@ foreach(int pt; pts)
     setpointattrib(0, "P", pt, pos);
 }
 
-/* -------------------------------------------------------------- */
-// N + up to #orient
-vector Xaxis = normalize(v@N);
-vector Yaxis = normalize(v@up);
-vector Zaxis = cross(Xaxis,Yaxis);
-vector center = v@P;
-matrix myTransform = set(Xaxis,Yaxis,Zaxis,center);
-p@orient = quaternion(matrix3(myTransform));
 
 /* -------------------------------------------------------------- */
 // vel #along #curve
 if(i@ptnum>0){
-    v@v = @P-point(0,"P",i@ptnum-1);
+    v@v = v@P-point(0,"P",i@ptnum-1);
 }else{
     v@v = point(0,"P",i@ptnum+1)-v@P;
 }
@@ -263,36 +381,6 @@ if(pcnumfound(handle)>0){
 }
 v@Cd=pow(d,chf("exp"))+{0,0,1};
 
-/* -------------------------------------------------------------- */
-// remove prims with less than 3 points
-int pts[] = primpoints( 0, i@primnum );
-if( len(pts) < 3 ) removeprim( 0, i@primnum, 1 );
-
-/* -------------------------------------------------------------- */
-// #ramp from #distance to #surface 
-int prim;
-vector uv;
-float dmin = chf("dist_min");
-float dmax = chf("dist_max");
-float d = xyzdist(1,v@P,prim,uv,dmax);
-float f = fit(d,dmin,dmax,0,1);
-if(chi("reverse_direction")==1)f=fit01(f,1,0);
-v@Cd = f + {0,0,1};
-
-/* -------------------------------------------------------------- */
-// #delete by #proximity to #surface (run over points)
-int prim;
-vector uv;
-float d = xyzdist(1,v@P,prim,uv,chf("maxdist"));
-if(chi("invert_selection")==1){
-     if(d<chf("maxdist")){
-         removepoint(0,i@ptnum);
-     }
-}else{
-    if(d>=chf("maxdist")){
-        removepoint(0,i@ptnum);
-    }
-}
 
 /* -------------------------------------------------------------- */
 // create u attribute along one curve (run over points)
@@ -371,6 +459,15 @@ rotate(m, radians(chf("angle_in_degrees"), axis);
 p@orient = quaternion(m);
 
 /* -------------------------------------------------------------- */
+// #sdf, #outside
+// keep points outside of SDF volume
+float vs = volumesample(1,0,@P);
+if(vs<0){
+    vector vg = normalize(volumegradient(1,0,@P));
+    v@P -= vg * vs;
+}
+
+/* -------------------------------------------------------------- */
 // #intersection of 2 #bounds
 vector m1,M1,m2,M2;
 getbbox(0,m1,M1);
@@ -384,7 +481,7 @@ if(m2.x>M1.x || M2.x< m1.x || m2.y>M1.y || M2.y< m1.y || m2.z>M1.z || M2.z< m1.z
 }
 
 /* -------------------------------------------------------------- */
-// divscale #disturbance
+// #DOPs divscale #disturbance
 if(f@density< chf("max_density")){
 
     float speed = length(v@vel);
@@ -411,20 +508,6 @@ if(f@density< chf("max_density")){
     }   
 }
 
-/* -------------------------------------------------------------- */
-// #volume #motionblur using vel from second input (not VDB)
-float vx=volumesample(1,0,v@P);
-float vy=volumesample(1,1,v@P);
-float vz=volumesample(1,2,v@P);
-vector v = set(vx,vy,vz);
-if(length(v)>0){
-    float dsum=0;
-    for(int i=0;i< chi("steps");i++){
-        float f = float(i)/float(chi("steps")-1);
-        dsum += volumesample(0,0,v@P+v*chf("displacement")*f);
-    }
-    f@density = dsum /float(chi("steps"));
-}
 
 /* -------------------------------------------------------------- */
 // 3d fbm #noise - for vel
@@ -515,14 +598,6 @@ if(pcnumfound(handle)>0){
     }
 }
 
-/* -------------------------------------------------------------- */
-// #volume #camera #cull
-vector pndc = toNDC(chs("camera_name"), v@P);
-// padding
-float pad = chf("padding");
-if(pndc.x< 0-pad || pndc.x>1+pad || pndc.y< 0-pad || pndc.y>1+pad || pndc.z>=0 ){
-    f@density=0;    
-}
 
 /* -------------------------------------------------------------- */
 // bunker bullet auto freeze
@@ -570,6 +645,7 @@ if(pcnumfound(handle)>0){
     }
 }
 
+
 /* -------------------------------------------------------------- */
 // remove #lone points (unconnected)
 if(neighbourcount(0,i@ptnum)==0){
@@ -615,78 +691,12 @@ float occ = clamp(vop_bias(1.0-(tempOcc / rays), bias), 0, 1);
 v@Cd=occ;
 
 // -----------------------------------------------------------------
-// #hue #shift
-vector hsv = rgbtohsv(@Cd);
-hsv.x+=chf("hue_shift");
-@Cd= hsvtorgb(hsv);
-// -----------------------------------------------------------------
-// #soft #clip (from pyro1 vfl)
-float softclip (
-      float f; // field value
-      float s; // start val for compression
-      float c; // compression
-   )
-{
-   float out = f;
-   if(f>s && c>0) {
-      float ki = 1.0 / c;
-      float w  = 1.0 / (c*log(10.0));
-      float v  = log10(pow(w,ki));
-      out = log10(pow((f-s)+w,ki)) - v + s;
-   }
-   return out;
-}
-// @P.y=softclip(@P.y,2,1); example usage
-// -----------------------------------------------------------------
 // delete polygons with only 2 points (lines)
 int a = len(primpoints(0,@primnum));
 if(a<3)removeprim(0,@primnum,1);
-// -----------------------------------------------------------------
-// #project on #sdf
-for(int i=0;i<chi("steps");i++){
-    @P.y-= chf("step_size");
-    float vs = volumesample(1,0,@P);
-    if(vs<0){
-        break;
-    }
-    if(i==chi("steps")-1){
-        removepoint(0,@ptnum,1);
-    }
-}
-// -----------------------------------------------------------------
-//convert #group to #attrib
-string groups[] = detailintrinsic(0, "primitivegroups");
-s[]@groups=groups;
-int a=0;
-foreach(string i; groups){   
-    if(inprimgroup(0,i,@primnum) == 1){
-        s@group=i;
-        break;
-    }
-    a++;
-}
-// random color from group number
-@Cd=rand(a);
-i@groupnum=a;
-// -----------------------------------------------------------------
-// #point #density (normalized)
-int pc = pcnumfound(pcopen(0,"P",@P,chf("radius"),chi("maxpoints")));
-float density = float(pc)/float(chi("maxpoints"));
-// -----------------------------------------------------------------
-// #volume #diffusion 
-float dsum = 0;
-float mask = 1; // could be from ramp,volume,noise 
-
-for(int i=0;i<chi("steps");i++){
-    vector n = (rand(v@P*2389.42+@Frame+i)*vector(2)-1)*chf("diffusion")*mask;
-    dsum += volumesample(0,0,@P+n);
-
-}
-f@density = dsum / float(chi("steps"));
 // -----------------------------------------------------------------
 // worley (#cell) #noise
 float dist1,dist2;
 wnoise(@P * chf("freq")+chv("offset"), chi("seed"), dist1, dist2);
 float cellnoise = dist1;
 // -----------------------------------------------------------------
-//
