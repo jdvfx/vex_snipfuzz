@@ -4,12 +4,17 @@ from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
 from PySide2.QtGui import QFont
 from PySide2.QtCore import Qt
 
+import re
 from typing import List,Tuple
 from enum import Enum
 
 class SearchMode(Enum):
     fuzzy = 0
     hashtag = 1
+    exactmatch = 2
+
+# TODO: implement exact match
+# use the Alt key to toggle between 3 search modes
 
 class CaseSensive(Enum):
     upperlower = 0
@@ -33,16 +38,12 @@ class SnipFuzz(QtWidgets.QWidget):
         self.file = vex_file
         self.snippets:List[str] = self.get_snippet_list()
 
-        # set font and style
-        cascadia_available = False
+        # set font and style        
         text_style  = 'background-color: #161616; color: #aaaaaa; padding: 7px;'
         font = QtGui.QFont()
         font.setPointSize(10)
-        if cascadia_available:
-            font.setFamily("Cascadia Mono")
-        else:
-            font.setBold(True)
-            font.setStyleHint(QFont.Monospace)
+        font.setBold(True)
+        font.setStyleHint(QFont.Monospace)
             
         self.ui.textfield.textChanged.connect(self.textchanged)
         self.ui.setStyleSheet("background-color: #000000;") 
@@ -82,10 +83,10 @@ class SnipFuzz(QtWidgets.QWidget):
     """
             
     def fuzzy_search(self, search, string) -> float:
-
-        # TO DO:
-        # find the best score possible, instead of searching once only
-
+    
+        if self.search_mode == SearchMode.hashtag:
+            string = self.keep_hashtags_only(string)
+    
         s = search
         l = string
         li = 0
@@ -113,11 +114,23 @@ class SnipFuzz(QtWidgets.QWidget):
         else:
             return match_score
             
-
+    # ----------------------------------------------------------
+    """ keep only hastags in the block of text """
+    def keep_hashtags_only(self,text:str) -> str:
+        hashtags = ""
+        lines = text.split("\n")
+        for line in lines:
+            if line.startswith("//") and "#" in line:
+                filtered = list(filter(lambda b: b.startswith("#"), line.split(" ")))
+                h = " ".join(filtered)
+                h = re.sub("#","",h)
+                hashtags = h
+        return hashtags
+        
     # ----------------------------------------------------------
     """ fuzzy search in snippet lines, return list of snippets """
     def search_snippets(self,search_string) -> List[Tuple[float,int]]:
-        print("...............")
+    
         search_results = []
         
         if len(search_string)==0:
@@ -129,12 +142,8 @@ class SnipFuzz(QtWidgets.QWidget):
                 search_string = search_string.lower()
                 
             match_score = self.fuzzy_search(search_string,snippet)
-            
-            #print("match_score" , smatch_score)
-         
 
             if match_score>0:
-                print(idx,match_score)
                 result:Tuple[float,int] = (match_score,idx)
                 search_results.append(result)
 
@@ -158,7 +167,8 @@ class SnipFuzz(QtWidgets.QWidget):
             Qt.Key_Down: lambda: setattr(self, 'snippet_index', self.snippet_index + 1),
             Qt.Key_Alt: lambda: setattr(self, 'search_mode', SearchMode.hashtag if self.search_mode is SearchMode.fuzzy else SearchMode.fuzzy),
             Qt.Key_Shift: lambda: setattr(self, 'case_sensitive', CaseSensive.lower if self.case_sensitive is CaseSensive.upperlower else CaseSensive.upperlower),
-            Qt.Key_Control: lambda: (self.wrangle.parm("snippet").set(self.ui.text.text()), self.close())
+            Qt.Key_Return: lambda: (self.wrangle.parm("snippet").set(self.ui.text.text()), self.close()),
+            Qt.Key_Control: lambda: (self.wrangle.parm("snippet").set(self.ui.text.text()), self.close()) #duplicate, might remove later
         }
 
         action = key_actions.get(e.key())
