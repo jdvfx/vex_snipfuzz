@@ -1,10 +1,10 @@
 # importing QT libraries 
-from PyQt5.QtWidgets import * 
-from PyQt5 import QtGui 
-from PyQt5.QtGui import * 
-from PyQt5.QtCore import * 
-from PyQt5 import uic
-from PyQt5.QtCore import Qt
+# from PyQt5.QtWidgets import * 
+# from PyQt5 import QtGui 
+# from PyQt5.QtGui import * 
+# from PyQt5.QtCore import * 
+# from PyQt5 import uic
+# from PyQt5.QtCore import Qt
 
 import re
 from typing import List,Tuple
@@ -22,16 +22,16 @@ class CaseSensive(Enum):
 
 class Utils():
 
-    def __init__(self):
+    def __init__(self,vex_file:str):
         self.search_mode = SearchMode.fuzzy
         self.case_sensitive = CaseSensive.lower
         self.snippet_index = 0
+        if vex_file:
+            self.get_snippet_list(vex_file)
 
-        pass
     # ----------------------------------------------------------
     """ split file by separators containing dashes """
-    def get_snippet_list(self,file:str) -> List[str]:
-        # print(">",file)
+    def get_snippet_list(self,file:str):
         with open(file,"r") as f:
             lines = f.read().splitlines()
 
@@ -46,7 +46,8 @@ class Utils():
         if len(snip_lines)>0:
             snippets.append(snip_lines)
 
-        return snippets
+        self.snippets = snippets
+
 
     # ----------------------------------------------------------
     """
@@ -97,7 +98,6 @@ class Utils():
                 # eg: '//#firstag #secondtag
                 line = re.sub("//","",line)
                 filtered = list(filter(lambda b: b.startswith("#"), line.split(" ")))
-                print("..",filtered)
                 h = " ".join(filtered)
                 h = re.sub("#","",h)
                 hashtags = h
@@ -105,14 +105,12 @@ class Utils():
 
     """ fuzzy search in snippet lines, return list of snippets """
     def search_snippets(self,search_string) -> List[Tuple[float,int]]:
-
         search_results = []
         
         if len(search_string)==0:
             return search_results
 
         for idx,snippet in enumerate(self.snippets):
-
             if self.case_sensitive == CaseSensive.lower:
                 search_string = search_string.lower()
                 
@@ -123,32 +121,23 @@ class Utils():
                 search_results.append(result)
 
         search_results.sort(reverse=True)
-
-
         return search_results        
 
     # ----------------------------------------------------------
-    def update_text(self,text):
-        print("snippet index :",self.snippet_index)
+    def update_text(self,text) -> Tuple[str,str]:
 
         results:List[Tuple[float,int]] = self.search_snippets(text)
 
-        print(results)
+        case = "A" if self.case_sensitive == CaseSensive.upperlower else "a"
+        search_mode = "fuzzy" if self.search_mode == SearchMode.fuzzy else "#"
+        s = f"{search_mode} {case}"
+       
+        current_snippet = ""
+        if len(results)>0:
+            self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
+            current_snippet = self.snippets[results[self.snippet_index][1]]
+            match = results[self.snippet_index][0]
+            s = f"{s}  {self.snippet_index+1}/{len(results)}    match:{match:.2f}"
 
-    #     case = "A" if self.case_sensitive == CaseSensive.upperlower else "a"
-    #     search_mode = "fuzzy" if self.search_mode == SearchMode.fuzzy else "#"
-    #     s = f"{search_mode} {case}"
-    #     
-    #     if len(results)>0:
-    #         self.snippet_index:int = min(max(0,self.snippet_index),len(results)-1)
-    #         current_snippet = self.snippets[results[self.snippet_index][1]]
-    #         self.ui.text.setText(current_snippet)
-    #         match = results[self.snippet_index][0]
-    #
-    #         s = f"{s}  {self.snippet_index+1}/{len(results)}    match:{match:.2f}"
-    #
-    #     self.ui.status.setText(s)
-    #
-    def textchanged(self,text):
-        self.update_text(text)
+        return (current_snippet,s)
 
