@@ -16,6 +16,7 @@ class MainWindow(QMainWindow):
         self.ui = uic.loadUi(ui_file, self) # Load the .ui file
 
         self.utils = Utils(vex_file)
+        self.textfield.textChanged.connect(self.textchanged)
 
     def keyPressEvent(self, e):
         if e.key() == Qt.Key_Up:
