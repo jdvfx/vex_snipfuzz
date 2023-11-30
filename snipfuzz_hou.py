@@ -1,3 +1,9 @@
+# where 'snipfuzz.ui' and 'vex.c' are located
+# -------------------------------------------------------
+install_dir = "/home/bunker/Desktop/git/vex_snipfuzz/"
+# -------------------------------------------------------
+
+
 # houdini imports
 import hou
 from PySide2 import QtCore, QtUiTools, QtWidgets, QtGui
@@ -221,11 +227,6 @@ def find_wrangle():
                 return node
 
 # ----------------------------------------------------------
-"""
-where the 'snipfuzz.ui' and 'vex.c' files are located
-
-"""
-install_dir = "/home/bunker/Desktop/git/vex_snipfuzz/"
 
 wrangle = find_wrangle()
 if wrangle is not None:
