@@ -11,6 +11,7 @@ ui_file:str = f"{install_dir}/snipfuzz.ui"
 app = QApplication([]) # QT #
 window = MainWindow(ui_file,vex_file)
 
+
 window.show()
 app.exec_()
 
